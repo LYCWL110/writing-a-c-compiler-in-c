@@ -1,5 +1,3 @@
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include "asm_ast.h"
@@ -13,23 +11,50 @@
 
 /* Helper to emit an operand */
 static void emit_operand(FILE *out, AsmOperand *op) {
-    if (op->type == ASM_OPERAND_IMM) {
-        fprintf(out, "$%d", op->imm);
-    } else if (op->type == ASM_OPERAND_REG) {
-        fprintf(out, "%%%s", op->reg_name);
+    switch (op->type) {
+        case ASM_OPERAND_IMM:
+            fprintf(out, "$%d", op->imm);
+            break;
+        case ASM_OPERAND_REG:
+            fprintf(out, "%%%s", op->reg == REG_AX ? "eax" : "r10d");
+            break;
+        case ASM_OPERAND_STACK:
+            fprintf(out, "%d(%%rbp)", op->stack_offset);
+            break;
+        case ASM_OPERAND_PSEUDO:
+            /* Pseudos should have been replaced by now — emit an error marker */
+            fprintf(out, "<pseudo:%s>", op->pseudo_name);
+            break;
     }
 }
 
 /* Helper to emit a single instruction */
 static void emit_instruction(FILE *out, AsmInstruction *inst) {
-    if (inst->type == ASM_INST_MOV) {
-        fprintf(out, "    movl    ");
-        emit_operand(out, inst->src);
-        fprintf(out, ", ");
-        emit_operand(out, inst->dst);
-        fprintf(out, "\n");
-    } else if (inst->type == ASM_INST_RET) {
-        fprintf(out, "    ret\n");
+    switch (inst->type) {
+        case ASM_INST_MOV:
+            fprintf(out, "    movl    ");
+            emit_operand(out, inst->src);
+            fprintf(out, ", ");
+            emit_operand(out, inst->dst);
+            fprintf(out, "\n");
+            break;
+        case ASM_INST_UNARY:
+            fprintf(out, "    %s    ",
+                    inst->unary_op == ASM_UNARY_NEG ? "negl" : "notl");
+            emit_operand(out, inst->operand);
+            fprintf(out, "\n");
+            break;
+        case ASM_INST_ALLOCATE_STACK:
+            fprintf(out, "    subq    $%d, %%rsp\n", inst->src ? inst->src->imm : 0);
+            break;
+        case ASM_INST_RET:
+            /* Function epilogue */
+            fprintf(out, "    movq    %%rbp, %%rsp\n");
+            fprintf(out, "    popq    %%rbp\n");
+            fprintf(out, "    ret\n");
+            break;
+        default:
+            break;
     }
 }
 
@@ -41,11 +66,15 @@ void emit(FILE *out, AsmProgram *prog) {
 
     AsmFunction *func = prog->function;
 
-    /* .globl <prefix><name> */
+    /* .globl <name> */
     fprintf(out, ".globl %s%s\n", FUNC_PREFIX, func->name);
 
-    /* <prefix><name>: */
+    /* <name>: (function label) */
     fprintf(out, "%s%s:\n", FUNC_PREFIX, func->name);
+
+    /* Function prologue */
+    fprintf(out, "    pushq   %%rbp\n");
+    fprintf(out, "    movq    %%rsp, %%rbp\n");
 
     /* Instructions */
     AsmInstruction *inst = func->instructions;

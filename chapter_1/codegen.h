@@ -1,10 +1,14 @@
 #ifndef CODEGEN_H
 #define CODEGEN_H
 
-#include "ast.h"
+#include "tacky.h"
 #include "asm_ast.h"
 
-/* Convert C AST to Assembly AST */
-AsmProgram *codegen(Program *prog);
+/* Convert TACKY IR to Assembly AST through three sub-stages:
+ *   (A) TACKY → Assembly (with pseudoregisters)
+ *   (B) Replace pseudos with stack addresses
+ *   (C) Fix invalid instructions (insert AllocateStack, rewrite mem-to-mem movs)
+ */
+AsmProgram *codegen(TackyProgram *tacky);
 
 #endif /* CODEGEN_H */

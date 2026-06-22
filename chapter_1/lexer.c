@@ -118,13 +118,24 @@ Token *lex(const char *source) {
         int tok_start_line = line;
         int tok_start_col = col;
 
+        /* Two-char token: -- (decrement) — must be checked before single '-' */
+        if (source[pos] == '-' && source[pos+1] == '-') {
+            Token *t = new_token(TOK_DECREMENT, "--", tok_start_line, tok_start_col);
+            append_token(&head, &tail, t);
+            pos += 2;
+            col += 2;
+            continue;
+        }
+
         /* Single-char tokens */
         switch (source[pos]) {
             case '(':
             case ')':
             case '{':
             case '}':
-            case ';': {
+            case ';':
+            case '~':
+            case '-': {
                 TokenType tt;
                 switch (source[pos]) {
                     case '(': tt = TOK_LPAREN; break;
@@ -132,6 +143,8 @@ Token *lex(const char *source) {
                     case '{': tt = TOK_LBRACE; break;
                     case '}': tt = TOK_RBRACE; break;
                     case ';': tt = TOK_SEMICOLON; break;
+                    case '~': tt = TOK_COMPLEMENT; break;
+                    case '-': tt = TOK_MINUS; break;
                     default:  tt = TOK_EOF; break; /* unreachable */
                 }
                 char lex[2] = {source[pos], '\0'};
@@ -229,7 +242,7 @@ Token *lex(const char *source) {
 void tokens_print(Token *head) {
     const char *type_names[] = {
         "IDENTIFIER", "CONSTANT", "INT", "VOID", "RETURN",
-        "(", ")", "{", "}", ";", "EOF"
+        "(", ")", "{", "}", ";", "-", "~", "--", "EOF"
     };
     Token *cur = head;
     while (cur) {

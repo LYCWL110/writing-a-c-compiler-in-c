@@ -16,6 +16,18 @@ Exp *make_exp_constant(int value) {
     return e;
 }
 
+Exp *make_exp_unary(UnaryOperator op, Exp *operand) {
+    Exp *e = malloc(sizeof(Exp));
+    if (!e) {
+        fprintf(stderr, "Memory allocation error\n");
+        exit(1);
+    }
+    e->type = AST_EXP_UNARY;
+    e->unary.operator = op;
+    e->unary.operand = operand;
+    return e;
+}
+
 Statement *make_statement_return(Exp *return_val) {
     Statement *s = malloc(sizeof(Statement));
     if (!s) {
@@ -52,9 +64,20 @@ Program *make_program(FunctionDef *function) {
 
 /* === Pretty-print === */
 
+static const char *unary_op_name(UnaryOperator op) {
+    return op == UNARY_COMPLEMENT ? "Complement" : "Negate";
+}
+
 static void ast_print_exp(Exp *e, int indent) {
     for (int i = 0; i < indent; i++) printf("  ");
-    printf("Constant(%d)\n", e->value);
+    if (e->type == AST_EXP_CONSTANT) {
+        printf("Constant(%d)\n", e->value);
+    } else {
+        printf("Unary(%s,\n", unary_op_name(e->unary.operator));
+        ast_print_exp(e->unary.operand, indent + 1);
+        for (int i = 0; i < indent; i++) printf("  ");
+        printf(")\n");
+    }
 }
 
 static void ast_print_statement(Statement *s, int indent) {
@@ -77,8 +100,12 @@ void ast_print(Program *prog) {
 
 /* === Free === */
 
-static void ast_free_exp(Exp *e) {
-    if (e) free(e);
+void ast_free_exp(Exp *e) {
+    if (!e) return;
+    if (e->type == AST_EXP_UNARY) {
+        ast_free_exp(e->unary.operand);
+    }
+    free(e);
 }
 
 static void ast_free_statement(Statement *s) {

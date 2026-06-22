@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include "lexer.h"
 #include "parser.h"
+#include "tacky_gen.h"
 #include "codegen.h"
 #include "emit.h"
 #include "ast.h"
@@ -56,7 +57,6 @@ static char *replace_ext(const char *path, const char *new_ext) {
 static int run_cmd(const char *cmd) {
     int ret = system(cmd);
     if (ret != 0) {
-        /* system() returns raw status; extract actual exit code */
         if (WIFEXITED(ret)) {
             int exit_code = WEXITSTATUS(ret);
             if (exit_code != 0) {
@@ -76,6 +76,7 @@ static void print_usage(const char *prog) {
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  --lex      Stop after lexing\n");
     fprintf(stderr, "  --parse    Stop after parsing\n");
+    fprintf(stderr, "  --tacky    Stop after TACKY generation\n");
     fprintf(stderr, "  --codegen  Stop after code generation\n");
     fprintf(stderr, "  -S         Output assembly file only, don't assemble or link\n");
 }
@@ -83,6 +84,7 @@ static void print_usage(const char *prog) {
 int main(int argc, char **argv) {
     int stop_lex = 0;
     int stop_parse = 0;
+    int stop_tacky = 0;
     int stop_codegen = 0;
     int emit_asm_only = 0;
     char *source_file = NULL;
@@ -93,6 +95,8 @@ int main(int argc, char **argv) {
             stop_lex = 1;
         } else if (strcmp(argv[i], "--parse") == 0) {
             stop_parse = 1;
+        } else if (strcmp(argv[i], "--tacky") == 0) {
+            stop_tacky = 1;
         } else if (strcmp(argv[i], "--codegen") == 0) {
             stop_codegen = 1;
         } else if (strcmp(argv[i], "-S") == 0) {
@@ -130,65 +134,54 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    /* Step 2: Compile (Lex → Parse → Codegen → Emit) */
+    /* Step 2: Compile pipeline: Lex → Parse → TACKY → Codegen → Emit */
 
     /* Lex */
     Token *tokens = lex(source);
-    if (!tokens) {
-        free(source);
-        free(preprocessed_file);
-        return 1;
-    }
+    if (!tokens) { free(source); free(preprocessed_file); return 1; }
 
     if (stop_lex) {
-        /* tokens_print(tokens); -- don't print by default */
-        tokens_free(tokens);
-        free(source);
-        remove(preprocessed_file);
-        free(preprocessed_file);
-        return 0;
+        tokens_free(tokens); free(source); remove(preprocessed_file);
+        free(preprocessed_file); return 0;
     }
 
     /* Parse */
     Program *ast = parse(tokens);
     if (!ast) {
-        tokens_free(tokens);
-        free(source);
-        remove(preprocessed_file);
-        free(preprocessed_file);
-        return 1;
+        tokens_free(tokens); free(source); remove(preprocessed_file);
+        free(preprocessed_file); return 1;
     }
 
     if (stop_parse) {
-        /* ast_print(ast); -- don't print by default */
-        ast_free(ast);
-        tokens_free(tokens);
-        free(source);
-        remove(preprocessed_file);
-        free(preprocessed_file);
+        ast_free(ast); tokens_free(tokens); free(source);
+        remove(preprocessed_file); free(preprocessed_file); return 0;
+    }
+
+    /* TACKY generation: C AST → TACKY IR */
+    TackyProgram *tacky = gen_tacky(ast);
+    if (!tacky) {
+        ast_free(ast); tokens_free(tokens); free(source);
+        remove(preprocessed_file); free(preprocessed_file); return 1;
+    }
+
+    if (stop_tacky) {
+        tacky_free(tacky); ast_free(ast); tokens_free(tokens);
+        free(source); remove(preprocessed_file); free(preprocessed_file);
         return 0;
     }
 
-    /* Code generation: C AST → Assembly AST */
-    AsmProgram *asm_prog = codegen(ast);
+    /* Code generation: TACKY → Assembly AST (3 sub-stages) */
+    AsmProgram *asm_prog = codegen(tacky);
     if (!asm_prog) {
-        ast_free(ast);
-        tokens_free(tokens);
-        free(source);
-        remove(preprocessed_file);
-        free(preprocessed_file);
+        tacky_free(tacky); ast_free(ast); tokens_free(tokens);
+        free(source); remove(preprocessed_file); free(preprocessed_file);
         return 1;
     }
 
     if (stop_codegen) {
-        /* asm_ast_print(asm_prog); -- don't print by default */
-        asm_ast_free(asm_prog);
-        ast_free(ast);
-        tokens_free(tokens);
-        free(source);
-        remove(preprocessed_file);
-        free(preprocessed_file);
-        return 0;
+        asm_ast_free(asm_prog); tacky_free(tacky); ast_free(ast);
+        tokens_free(tokens); free(source); remove(preprocessed_file);
+        free(preprocessed_file); return 0;
     }
 
     /* Emit: Assembly AST → .s file */
@@ -196,33 +189,20 @@ int main(int argc, char **argv) {
     FILE *asm_out = fopen(asm_file, "w");
     if (!asm_out) {
         fprintf(stderr, "Error: Cannot write to '%s'\n", asm_file);
-        asm_ast_free(asm_prog);
-        ast_free(ast);
-        tokens_free(tokens);
-        free(source);
-        remove(preprocessed_file);
-        free(preprocessed_file);
-        free(asm_file);
-        return 1;
+        asm_ast_free(asm_prog); tacky_free(tacky); ast_free(ast);
+        tokens_free(tokens); free(source); remove(preprocessed_file);
+        free(preprocessed_file); free(asm_file); return 1;
     }
     emit(asm_out, asm_prog);
     fclose(asm_out);
 
-    /* Cleanup all intermediate structures */
-    asm_ast_free(asm_prog);
-    ast_free(ast);
-    tokens_free(tokens);
-    free(source);
-
-    /* Delete preprocessed file */
-    remove(preprocessed_file);
-    free(preprocessed_file);
+    /* Cleanup */
+    asm_ast_free(asm_prog); tacky_free(tacky); ast_free(ast);
+    tokens_free(tokens); free(source);
+    remove(preprocessed_file); free(preprocessed_file);
 
     /* If -S flag, stop here, keep .s file */
-    if (emit_asm_only) {
-        free(asm_file);
-        return 0;
-    }
+    if (emit_asm_only) { free(asm_file); return 0; }
 
     /* Step 3: Assemble and link */
     char *exe_file = replace_ext(source_file, "");
@@ -230,17 +210,10 @@ int main(int argc, char **argv) {
         char cmd[1024];
         snprintf(cmd, sizeof(cmd), "gcc '%s' -o '%s'", asm_file, exe_file);
         int ret = run_cmd(cmd);
-        if (ret != 0) {
-            free(asm_file);
-            free(exe_file);
-            return ret;
-        }
+        if (ret != 0) { free(asm_file); free(exe_file); return ret; }
     }
 
-    /* Delete assembly file */
     remove(asm_file);
-    free(asm_file);
-    free(exe_file);
-
+    free(asm_file); free(exe_file);
     return 0;
 }

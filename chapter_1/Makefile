@@ -8,7 +8,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 TARGET = compiler
-OBJS = main.o lexer.o parser.o ast.o asm_ast.o codegen.o emit.o
+OBJS = main.o lexer.o parser.o ast.o tacky.o tacky_gen.o asm_ast.o codegen.o emit.o
 
 all: $(TARGET)
 
@@ -26,18 +26,22 @@ test:
 	@echo "Building compiler..."
 	@$(MAKE) --no-print-directory $(TARGET)
 	@echo "Running test suite..."
-	/home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 1 --expected-error-codes 1
+	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --expected-error-codes 1
 
 test-lex:
 	@$(MAKE) --no-print-directory $(TARGET)
-	/home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 1 --stage lex
+	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --stage lex
 
 test-parse:
 	@$(MAKE) --no-print-directory $(TARGET)
-	/home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 1 --stage parse
+	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --stage parse
+
+test-tacky:
+	@$(MAKE) --no-print-directory $(TARGET)
+	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --stage tacky
 
 test-codegen:
 	@$(MAKE) --no-print-directory $(TARGET)
-	/home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 1 --stage codegen
+	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --stage codegen
 
-.PHONY: all clean test test-lex test-parse test-codegen
+.PHONY: all clean test test-lex test-parse test-tacky test-codegen
