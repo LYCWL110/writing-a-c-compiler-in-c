@@ -20,6 +20,15 @@ typedef enum {
     TOK_STAR,       /* * */
     TOK_SLASH,      /* / */
     TOK_PERCENT,    /* % */
+    TOK_NOT,        /* ! */
+    TOK_AND,        /* && */
+    TOK_OR,         /* || */
+    TOK_EQ,         /* == */
+    TOK_NEQ,        /* != */
+    TOK_LT,         /* < */
+    TOK_GT,         /* > */
+    TOK_LEQ,        /* <= */
+    TOK_GEQ,        /* >= */
     TOK_EOF
 } TokenType;
 

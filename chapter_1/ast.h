@@ -18,7 +18,8 @@ typedef enum {
 
 typedef enum {
     UNARY_COMPLEMENT,   /* ~ */
-    UNARY_NEGATE        /* - */
+    UNARY_NEGATE,       /* - */
+    UNARY_NOT           /* ! */
 } UnaryOperator;
 
 typedef enum {
@@ -26,7 +27,15 @@ typedef enum {
     BINARY_SUBTRACT,
     BINARY_MULTIPLY,
     BINARY_DIVIDE,
-    BINARY_REMAINDER
+    BINARY_REMAINDER,
+    BINARY_AND,          /* && */
+    BINARY_OR,           /* || */
+    BINARY_EQUAL,        /* == */
+    BINARY_NOT_EQUAL,    /* != */
+    BINARY_LESS,         /* < */
+    BINARY_LESS_EQ,      /* <= */
+    BINARY_GREATER,      /* > */
+    BINARY_GREATER_EQ    /* >= */
 } BinaryOperator;
 
 /* Forward declarations */

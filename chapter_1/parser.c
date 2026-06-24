@@ -11,7 +11,8 @@ static int expect(ParserState *state, TokenType expected, const char *ctx) {
         const char *type_names[] = {
             "identifier", "constant", "'int'", "'void'", "'return'",
             "'('", "')'", "'{'", "'}'", "';'", "'-'", "'~'", "'--'",
-            "'+'", "'*'", "'/'", "'%'", "EOF"
+            "'+'", "'*'", "'/'", "'%'",
+            "'!'", "'&&'", "'||'", "'=='", "'!='", "'<'", "'>'", "'<='", "'>='", "EOF"
         };
         fprintf(stderr, "Parse error at line %d, col %d: Expected %s but found '%s'\n",
                 state->current->line, state->current->col,
@@ -37,18 +38,30 @@ static int precedence(TokenType t) {
     switch (t) {
         case TOK_STAR:    case TOK_SLASH: case TOK_PERCENT: return 50;
         case TOK_PLUS:    case TOK_MINUS:                    return 45;
-        default:                                              return -1;
+        case TOK_LT: case TOK_GT: case TOK_LEQ: case TOK_GEQ: return 35;
+        case TOK_EQ:      case TOK_NEQ:                      return 30;
+        case TOK_AND:                                        return 10;
+        case TOK_OR:                                         return 5;
+        default:                                             return -1;
     }
 }
 
 static BinaryOperator token_to_binary_op(TokenType t) {
     switch (t) {
-        case TOK_PLUS:     return BINARY_ADD;
-        case TOK_MINUS:    return BINARY_SUBTRACT;
-        case TOK_STAR:     return BINARY_MULTIPLY;
-        case TOK_SLASH:    return BINARY_DIVIDE;
-        case TOK_PERCENT:  return BINARY_REMAINDER;
-        default:           return BINARY_ADD; /* unreachable */
+        case TOK_PLUS:  return BINARY_ADD;
+        case TOK_MINUS: return BINARY_SUBTRACT;
+        case TOK_STAR:  return BINARY_MULTIPLY;
+        case TOK_SLASH: return BINARY_DIVIDE;
+        case TOK_PERCENT: return BINARY_REMAINDER;
+        case TOK_AND:   return BINARY_AND;
+        case TOK_OR:    return BINARY_OR;
+        case TOK_EQ:    return BINARY_EQUAL;
+        case TOK_NEQ:   return BINARY_NOT_EQUAL;
+        case TOK_LT:    return BINARY_LESS;
+        case TOK_LEQ:   return BINARY_LESS_EQ;
+        case TOK_GT:    return BINARY_GREATER;
+        case TOK_GEQ:   return BINARY_GREATER_EQ;
+        default:        return BINARY_ADD;
     }
 }
 
@@ -67,8 +80,11 @@ static Exp *parse_factor(ParserState *state) {
     }
 
     /* Unary operator */
-    if (t == TOK_MINUS || t == TOK_COMPLEMENT) {
-        UnaryOperator op = (t == TOK_MINUS) ? UNARY_NEGATE : UNARY_COMPLEMENT;
+    if (t == TOK_MINUS || t == TOK_COMPLEMENT || t == TOK_NOT) {
+        UnaryOperator op;
+        if (t == TOK_MINUS)      op = UNARY_NEGATE;
+        else if (t == TOK_COMPLEMENT) op = UNARY_COMPLEMENT;
+        else                     op = UNARY_NOT;
         state->current = state->current->next;
         Exp *inner = parse_factor(state);
         if (!inner) return NULL;

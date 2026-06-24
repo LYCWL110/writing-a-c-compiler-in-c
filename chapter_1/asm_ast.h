@@ -13,8 +13,13 @@ typedef enum {
     ASM_INST_MOV,
     ASM_INST_UNARY,
     ASM_INST_BINARY,
+    ASM_INST_CMP,
     ASM_INST_IDIV,
     ASM_INST_CDQ,
+    ASM_INST_JMP,
+    ASM_INST_JMPCC,
+    ASM_INST_SETCC,
+    ASM_INST_LABEL,
     ASM_INST_ALLOCATE_STACK,
     ASM_INST_RET
 } AsmInstType;
@@ -44,6 +49,10 @@ typedef enum {
     REG_R11    /* %r11d */
 } RegId;
 
+typedef enum {
+    CC_E, CC_NE, CC_G, CC_GE, CC_L, CC_LE
+} CondCode;
+
 typedef struct AsmOperand AsmOperand;
 typedef struct AsmInstruction AsmInstruction;
 typedef struct AsmFunction AsmFunction;
@@ -66,7 +75,9 @@ struct AsmInstruction {
     AsmOperand *dst;         /* for Mov */
     AsmUnaryOp unary_op;     /* for Unary */
     AsmBinaryOp binary_op;   /* for Binary (add/sub/mult) */
-    AsmOperand *operand;     /* for Unary (src and dst are the same) */
+    CondCode cond_code;       /* for JmpCC / SetCC */
+    char *label;              /* for Jmp / JmpCC / Label */
+    AsmOperand *operand;     /* for Unary / SetCC */
 };
 
 struct AsmFunction {
@@ -90,6 +101,11 @@ AsmInstruction *make_inst_unary(AsmUnaryOp op, AsmOperand *operand);
 AsmInstruction *make_inst_binary(AsmBinaryOp op, AsmOperand *src, AsmOperand *dst);
 AsmInstruction *make_inst_idiv(AsmOperand *divisor);
 AsmInstruction *make_inst_cdq(void);
+AsmInstruction *make_inst_cmp(AsmOperand *a, AsmOperand *b);
+AsmInstruction *make_inst_jmp(const char *label);
+AsmInstruction *make_inst_jmpcc(CondCode cc, const char *label);
+AsmInstruction *make_inst_setcc(CondCode cc, AsmOperand *dst);
+AsmInstruction *make_inst_label(const char *name);
 AsmInstruction *make_inst_allocate_stack(int size);
 AsmInstruction *make_inst_ret(void);
 AsmInstruction *append_instruction(AsmInstruction *head, AsmInstruction *new_inst);

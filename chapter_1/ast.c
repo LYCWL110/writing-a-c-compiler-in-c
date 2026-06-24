@@ -78,17 +78,30 @@ Program *make_program(FunctionDef *function) {
 /* === Pretty-print === */
 
 static const char *unary_op_name(UnaryOperator op) {
-    return op == UNARY_COMPLEMENT ? "Complement" : "Negate";
+    switch (op) {
+        case UNARY_COMPLEMENT: return "Complement";
+        case UNARY_NEGATE:     return "Negate";
+        case UNARY_NOT:        return "Not";
+        default:              return "?";
+    }
 }
 
 static const char *binary_op_name(BinaryOperator op) {
     switch (op) {
-        case BINARY_ADD:       return "Add";
-        case BINARY_SUBTRACT:  return "Subtract";
-        case BINARY_MULTIPLY:  return "Multiply";
-        case BINARY_DIVIDE:    return "Divide";
-        case BINARY_REMAINDER: return "Remainder";
-        default:               return "?";
+        case BINARY_ADD:          return "Add";
+        case BINARY_SUBTRACT:     return "Subtract";
+        case BINARY_MULTIPLY:     return "Multiply";
+        case BINARY_DIVIDE:       return "Divide";
+        case BINARY_REMAINDER:    return "Remainder";
+        case BINARY_AND:          return "And";
+        case BINARY_OR:           return "Or";
+        case BINARY_EQUAL:        return "Equal";
+        case BINARY_NOT_EQUAL:    return "NotEqual";
+        case BINARY_LESS:         return "LessThan";
+        case BINARY_LESS_EQ:      return "LessOrEqual";
+        case BINARY_GREATER:      return "GreaterThan";
+        case BINARY_GREATER_EQ:   return "GreaterOrEqual";
+        default:                  return "?";
     }
 }
 

@@ -4,12 +4,12 @@
 #include "codegen.h"
 
 /* ================================================================
- * Stage A: TACKY → Assembly AST (with pseudoregisters)
+ * Stage A: TACKY → Assembly AST
  * ================================================================ */
 
 static AsmOperand *val_to_operand(TackyVal *v) {
     return (v->type == TACKY_VAL_CONSTANT) ? make_operand_imm(v->value)
-                                           : make_operand_pseudo(v->name);
+                                            : make_operand_pseudo(v->name);
 }
 
 static AsmUnaryOp convert_unary_op(UnaryOperator op) {
@@ -25,6 +25,18 @@ static AsmBinaryOp convert_binary_op(BinaryOperator op) {
     }
 }
 
+static CondCode relational_cc(BinaryOperator op) {
+    switch (op) {
+        case BINARY_EQUAL:        return CC_E;
+        case BINARY_NOT_EQUAL:    return CC_NE;
+        case BINARY_LESS:         return CC_L;
+        case BINARY_LESS_EQ:      return CC_LE;
+        case BINARY_GREATER:      return CC_G;
+        case BINARY_GREATER_EQ:   return CC_GE;
+        default:                 return CC_E;
+    }
+}
+
 static AsmInstruction *tacky_inst_to_asm(TackyInstruction *inst) {
     if (inst->type == TACKY_INST_RETURN) {
         AsmInstruction *mov = make_inst_mov(val_to_operand(inst->val),
@@ -34,6 +46,16 @@ static AsmInstruction *tacky_inst_to_asm(TackyInstruction *inst) {
     }
 
     if (inst->type == TACKY_INST_UNARY) {
+        if (inst->unary_op == UNARY_NOT) {
+            /* Not(src, dst) → Cmp(Imm(0), src) + Mov(Imm(0), dst) + SetCC(E, dst) */
+            AsmInstruction *cmp = make_inst_cmp(make_operand_imm(0),
+                                                  val_to_operand(inst->src));
+            AsmInstruction *mov = make_inst_mov(make_operand_imm(0),
+                                                  val_to_operand(inst->dst));
+            AsmInstruction *set = make_inst_setcc(CC_E, val_to_operand(inst->dst));
+            cmp->next = mov; mov->next = set;
+            return cmp;
+        }
         AsmInstruction *mov = make_inst_mov(val_to_operand(inst->src),
                                              val_to_operand(inst->dst));
         mov->next = make_inst_unary(convert_unary_op(inst->unary_op),
@@ -42,26 +64,58 @@ static AsmInstruction *tacky_inst_to_asm(TackyInstruction *inst) {
     }
 
     if (inst->type == TACKY_INST_BINARY) {
+        /* Relational: Cmp(src2, src1) + Mov(Imm(0), dst) + SetCC(cc, dst) */
+        if (inst->binary_op >= BINARY_EQUAL && inst->binary_op <= BINARY_GREATER_EQ) {
+            AsmInstruction *cmp = make_inst_cmp(val_to_operand(inst->src2),
+                                                  val_to_operand(inst->src));
+            AsmInstruction *mov = make_inst_mov(make_operand_imm(0),
+                                                  val_to_operand(inst->dst));
+            AsmInstruction *set = make_inst_setcc(relational_cc(inst->binary_op),
+                                                    val_to_operand(inst->dst));
+            cmp->next = mov; mov->next = set;
+            return cmp;
+        }
+        /* Division / Remainder (existing) */
         if (inst->binary_op == BINARY_DIVIDE || inst->binary_op == BINARY_REMAINDER) {
             AsmInstruction *mov = make_inst_mov(val_to_operand(inst->src),
                                                   make_operand_reg(REG_AX));
             AsmInstruction *cdq = make_inst_cdq();
             AsmInstruction *idiv = make_inst_idiv(val_to_operand(inst->src2));
-            RegId result_reg = (inst->binary_op == BINARY_DIVIDE) ? REG_AX : REG_DX;
-            AsmInstruction *mov2 = make_inst_mov(make_operand_reg(result_reg),
+            RegId r = (inst->binary_op == BINARY_DIVIDE) ? REG_AX : REG_DX;
+            AsmInstruction *mov2 = make_inst_mov(make_operand_reg(r),
                                                    val_to_operand(inst->dst));
-            mov->next = cdq;
-            cdq->next = idiv;
-            idiv->next = mov2;
+            mov->next = cdq; cdq->next = idiv; idiv->next = mov2;
             return mov;
         }
-        /* Add, Subtract, Multiply */
+        /* Add/Sub/Mult */
         AsmInstruction *mov = make_inst_mov(val_to_operand(inst->src),
                                              val_to_operand(inst->dst));
         mov->next = make_inst_binary(convert_binary_op(inst->binary_op),
                                       val_to_operand(inst->src2),
                                       val_to_operand(inst->dst));
         return mov;
+    }
+
+    if (inst->type == TACKY_INST_COPY) {
+        return make_inst_mov(val_to_operand(inst->src), val_to_operand(inst->dst));
+    }
+    if (inst->type == TACKY_INST_JUMP) {
+        return make_inst_jmp(inst->target);
+    }
+    if (inst->type == TACKY_INST_JUMP_IF_ZERO) {
+        AsmInstruction *cmp = make_inst_cmp(make_operand_imm(0),
+                                              val_to_operand(inst->val));
+        cmp->next = make_inst_jmpcc(CC_E, inst->target);
+        return cmp;
+    }
+    if (inst->type == TACKY_INST_JUMP_IF_NOT_ZERO) {
+        AsmInstruction *cmp = make_inst_cmp(make_operand_imm(0),
+                                              val_to_operand(inst->val));
+        cmp->next = make_inst_jmpcc(CC_NE, inst->target);
+        return cmp;
+    }
+    if (inst->type == TACKY_INST_LABEL) {
+        return make_inst_label(inst->target);
     }
 
     fprintf(stderr, "Codegen error: unsupported TACKY instruction\n");
@@ -79,9 +133,8 @@ static AsmFunction *tacky_func_to_asm(TackyFunction *func) {
 }
 
 /* ================================================================
- * Stage B: Replace pseudoregisters with stack addresses
+ * Stage B: Replace pseudos
  * ================================================================ */
-
 #define MAX_PSEUDOS 64
 static struct { char *name; int offset; } pseudo_map[MAX_PSEUDOS];
 static int pseudo_count = 0;
@@ -89,140 +142,121 @@ static int pseudo_count = 0;
 static int get_or_alloc_offset(const char *name) {
     for (int i = 0; i < pseudo_count; i++)
         if (strcmp(pseudo_map[i].name, name) == 0) return pseudo_map[i].offset;
-    int offset = (pseudo_count == 0) ? -4 : pseudo_map[pseudo_count - 1].offset - 4;
+    int off = (pseudo_count == 0) ? -4 : pseudo_map[pseudo_count - 1].offset - 4;
     pseudo_map[pseudo_count].name = strdup(name);
-    pseudo_map[pseudo_count].offset = offset;
-    pseudo_count++;
-    return offset;
+    pseudo_map[pseudo_count].offset = off; pseudo_count++;
+    return off;
 }
-
 static void clear_pseudo_map(void) {
     for (int i = 0; i < pseudo_count; i++) free(pseudo_map[i].name);
     pseudo_count = 0;
 }
+static void replace_op(AsmOperand *op, int *max_offset) {
+    if (!op || op->type != ASM_OPERAND_PSEUDO) return;
+    int off = get_or_alloc_offset(op->pseudo_name);
+    free(op->pseudo_name);
+    op->type = ASM_OPERAND_STACK;
+    op->stack_offset = off;
+    if (-off > *max_offset) *max_offset = -off;
+}
 
 static int replace_pseudos(AsmInstruction *inst) {
-    int max_offset = 0;
+    int m = 0;
     while (inst) {
-        if (inst->src && inst->src->type == ASM_OPERAND_PSEUDO) {
-            int off = get_or_alloc_offset(inst->src->pseudo_name);
-            free(inst->src->pseudo_name);
-            inst->src->type = ASM_OPERAND_STACK;
-            inst->src->stack_offset = off;
-            if (-off > max_offset) max_offset = -off;
-        }
-        if (inst->dst && inst->dst->type == ASM_OPERAND_PSEUDO) {
-            int off = get_or_alloc_offset(inst->dst->pseudo_name);
-            free(inst->dst->pseudo_name);
-            inst->dst->type = ASM_OPERAND_STACK;
-            inst->dst->stack_offset = off;
-            if (-off > max_offset) max_offset = -off;
-        }
-        if (inst->operand && inst->operand->type == ASM_OPERAND_PSEUDO) {
-            int off = get_or_alloc_offset(inst->operand->pseudo_name);
-            free(inst->operand->pseudo_name);
-            inst->operand->type = ASM_OPERAND_STACK;
-            inst->operand->stack_offset = off;
-            if (-off > max_offset) max_offset = -off;
-        }
+        replace_op(inst->src, &m);
+        replace_op(inst->dst, &m);
+        replace_op(inst->operand, &m);
         inst = inst->next;
     }
-    return max_offset;
+    return m;
 }
 
 /* ================================================================
- * Stage C: Fix invalid instructions (build a new list approach)
+ * Stage C: Fix invalid instructions
  * ================================================================ */
-
-static void emit_fixed(AsmInstruction *node, AsmInstruction **head, AsmInstruction **tail) {
-    /* Helper: append a single node (with next=NULL) to the output list */
-    AsmInstruction *n = node;
+static void emit_fixed(AsmInstruction *n, AsmInstruction **h, AsmInstruction **t) {
     n->next = NULL;
-    if (!*head) { *head = *tail = n; }
-    else        { (*tail)->next = n; *tail = n; }
+    if (!*h) *h = *t = n; else { (*t)->next = n; *t = n; }
 }
 
-static AsmInstruction *fix_instructions(AsmInstruction *old_list, int stack_size) {
-    AsmInstruction *new_head = NULL, *new_tail = NULL;
-
-    if (stack_size > 0)
-        emit_fixed(make_inst_allocate_stack(stack_size), &new_head, &new_tail);
-
-    AsmInstruction *cur = old_list;
+static AsmInstruction *fix_instructions(AsmInstruction *old, int stk) {
+    AsmInstruction *nh = NULL, *nt = NULL;
+    if (stk > 0) emit_fixed(make_inst_allocate_stack(stk), &nh, &nt);
+    AsmInstruction *cur = old;
     while (cur) {
-        AsmInstruction *next = cur->next;
+        AsmInstruction *nx = cur->next;
 
-        /* Mov(Stack,Stack) → split through R10 */
+        /* Mov(Stack,Stack) */
         if (cur->type == ASM_INST_MOV
             && cur->src->type == ASM_OPERAND_STACK
             && cur->dst->type == ASM_OPERAND_STACK) {
             int dst_off = cur->dst->stack_offset;
             cur->dst = make_operand_reg(REG_R10);
-            emit_fixed(cur, &new_head, &new_tail);
-            emit_fixed(make_inst_mov(make_operand_reg(REG_R10),
-                                      make_operand_stack(dst_off)),
-                       &new_head, &new_tail);
-            cur = next; continue;
+            emit_fixed(cur, &nh, &nt);
+            emit_fixed(make_inst_mov(make_operand_reg(REG_R10), make_operand_stack(dst_off)), &nh, &nt);
+            cur = nx; continue;
         }
-
-        /* Idiv(Imm) → movl $n, %r10d then idivl %r10d */
-        if (cur->type == ASM_INST_IDIV
-            && cur->src->type == ASM_OPERAND_IMM) {
-            int val = cur->src->imm;
-            emit_fixed(make_inst_mov(make_operand_imm(val),
-                                      make_operand_reg(REG_R10)),
-                       &new_head, &new_tail);
+        /* Idiv(Imm) */
+        if (cur->type == ASM_INST_IDIV && cur->src->type == ASM_OPERAND_IMM) {
+            int v = cur->src->imm;
+            emit_fixed(make_inst_mov(make_operand_imm(v), make_operand_reg(REG_R10)), &nh, &nt);
             cur->src = make_operand_reg(REG_R10);
-            emit_fixed(cur, &new_head, &new_tail);
-            cur = next; continue;
+            emit_fixed(cur, &nh, &nt);
+            cur = nx; continue;
         }
-
-        /* Add/Sub(Stack,Stack) → movl src, %r10d then addl/subl %r10d, dst */
+        /* Add/Sub(Stack,Stack) */
         if (cur->type == ASM_INST_BINARY
             && (cur->binary_op == ASM_BINARY_ADD || cur->binary_op == ASM_BINARY_SUB)
             && cur->src->type == ASM_OPERAND_STACK
             && cur->dst->type == ASM_OPERAND_STACK) {
             int src_off = cur->src->stack_offset;
-            emit_fixed(make_inst_mov(make_operand_stack(src_off),
-                                      make_operand_reg(REG_R10)),
-                       &new_head, &new_tail);
+            emit_fixed(make_inst_mov(make_operand_stack(src_off), make_operand_reg(REG_R10)), &nh, &nt);
             cur->src = make_operand_reg(REG_R10);
-            emit_fixed(cur, &new_head, &new_tail);
-            cur = next; continue;
+            emit_fixed(cur, &nh, &nt);
+            cur = nx; continue;
         }
-
-        /* Imul(*,Stack) → movl dst,%r11d ; imull src,%r11d ; movl %r11d,dst */
+        /* Imul(*,Stack) */
         if (cur->type == ASM_INST_BINARY && cur->binary_op == ASM_BINARY_MULT
             && cur->dst->type == ASM_OPERAND_STACK) {
             int dst_off = cur->dst->stack_offset;
-            emit_fixed(make_inst_mov(make_operand_stack(dst_off),
-                                      make_operand_reg(REG_R11)),
-                       &new_head, &new_tail);
+            emit_fixed(make_inst_mov(make_operand_stack(dst_off), make_operand_reg(REG_R11)), &nh, &nt);
             cur->dst = make_operand_reg(REG_R11);
-            emit_fixed(cur, &new_head, &new_tail);
-            emit_fixed(make_inst_mov(make_operand_reg(REG_R11),
-                                      make_operand_stack(dst_off)),
-                       &new_head, &new_tail);
-            cur = next; continue;
+            emit_fixed(cur, &nh, &nt);
+            emit_fixed(make_inst_mov(make_operand_reg(REG_R11), make_operand_stack(dst_off)), &nh, &nt);
+            cur = nx; continue;
         }
-
-        /* Default: pass through unchanged */
-        emit_fixed(cur, &new_head, &new_tail);
-        cur = next;
+        /* Cmp(Stack,Stack) → split through R10 (fix 1st operand) */
+        if (cur->type == ASM_INST_CMP
+            && cur->src->type == ASM_OPERAND_STACK
+            && cur->dst->type == ASM_OPERAND_STACK) {
+            int src_off = cur->src->stack_offset;
+            emit_fixed(make_inst_mov(make_operand_stack(src_off), make_operand_reg(REG_R10)), &nh, &nt);
+            cur->src = make_operand_reg(REG_R10);
+            emit_fixed(cur, &nh, &nt);
+            cur = nx; continue;
+        }
+        /* Cmp(*, Imm) → fix 2nd operand through R11 */
+        if (cur->type == ASM_INST_CMP && cur->dst->type == ASM_OPERAND_IMM) {
+            int d_val = cur->dst->imm;
+            emit_fixed(make_inst_mov(make_operand_imm(d_val), make_operand_reg(REG_R11)), &nh, &nt);
+            cur->dst = make_operand_reg(REG_R11);
+            emit_fixed(cur, &nh, &nt);
+            cur = nx; continue;
+        }
+        /* Default: pass through */
+        emit_fixed(cur, &nh, &nt);
+        cur = nx;
     }
-    return new_head;
+    return nh;
 }
 
-/* ================================================================
- * Public entry
- * ================================================================ */
-
+/* ================================================================ */
 AsmProgram *codegen(TackyProgram *tacky) {
     if (!tacky || !tacky->function) { fprintf(stderr, "Codegen: empty\n"); return NULL; }
-    AsmFunction *asm_func = tacky_func_to_asm(tacky->function);
-    if (!asm_func) return NULL;
-    int size = replace_pseudos(asm_func->instructions);
+    AsmFunction *af = tacky_func_to_asm(tacky->function);
+    if (!af) return NULL;
+    int sz = replace_pseudos(af->instructions);
     clear_pseudo_map();
-    asm_func->instructions = fix_instructions(asm_func->instructions, size);
-    return make_asm_program(asm_func);
+    af->instructions = fix_instructions(af->instructions, sz);
+    return make_asm_program(af);
 }

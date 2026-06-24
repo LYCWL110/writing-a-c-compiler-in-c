@@ -118,28 +118,41 @@ Token *lex(const char *source) {
         int tok_start_line = line;
         int tok_start_col = col;
 
-        /* Two-char token: -- (decrement) — must be checked before single '-' */
+        /* Two-char tokens — must be checked before single-char equivalents */
         if (source[pos] == '-' && source[pos+1] == '-') {
             Token *t = new_token(TOK_DECREMENT, "--", tok_start_line, tok_start_col);
-            append_token(&head, &tail, t);
-            pos += 2;
-            col += 2;
-            continue;
+            append_token(&head, &tail, t); pos += 2; col += 2; continue;
+        }
+        if (source[pos] == '&' && source[pos+1] == '&') {
+            Token *t = new_token(TOK_AND, "&&", tok_start_line, tok_start_col);
+            append_token(&head, &tail, t); pos += 2; col += 2; continue;
+        }
+        if (source[pos] == '|' && source[pos+1] == '|') {
+            Token *t = new_token(TOK_OR, "||", tok_start_line, tok_start_col);
+            append_token(&head, &tail, t); pos += 2; col += 2; continue;
+        }
+        if (source[pos] == '=' && source[pos+1] == '=') {
+            Token *t = new_token(TOK_EQ, "==", tok_start_line, tok_start_col);
+            append_token(&head, &tail, t); pos += 2; col += 2; continue;
+        }
+        if (source[pos] == '!' && source[pos+1] == '=') {
+            Token *t = new_token(TOK_NEQ, "!=", tok_start_line, tok_start_col);
+            append_token(&head, &tail, t); pos += 2; col += 2; continue;
+        }
+        if (source[pos] == '<' && source[pos+1] == '=') {
+            Token *t = new_token(TOK_LEQ, "<=", tok_start_line, tok_start_col);
+            append_token(&head, &tail, t); pos += 2; col += 2; continue;
+        }
+        if (source[pos] == '>' && source[pos+1] == '=') {
+            Token *t = new_token(TOK_GEQ, ">=", tok_start_line, tok_start_col);
+            append_token(&head, &tail, t); pos += 2; col += 2; continue;
         }
 
         /* Single-char tokens */
         switch (source[pos]) {
-            case '(':
-            case ')':
-            case '{':
-            case '}':
-            case ';':
-            case '~':
-            case '-':
-            case '+':
-            case '*':
-            case '/':
-            case '%': {
+            case '(': case ')': case '{': case '}': case ';':
+            case '~': case '-': case '+': case '*': case '/': case '%':
+            case '!': case '<': case '>': {
                 TokenType tt;
                 switch (source[pos]) {
                     case '(': tt = TOK_LPAREN; break;
@@ -153,14 +166,14 @@ Token *lex(const char *source) {
                     case '*': tt = TOK_STAR; break;
                     case '/': tt = TOK_SLASH; break;
                     case '%': tt = TOK_PERCENT; break;
+                    case '!': tt = TOK_NOT; break;
+                    case '<': tt = TOK_LT; break;
+                    case '>': tt = TOK_GT; break;
                     default:  tt = TOK_EOF; break;
                 }
                 char lex[2] = {source[pos], '\0'};
                 Token *t = new_token(tt, lex, tok_start_line, tok_start_col);
-                append_token(&head, &tail, t);
-                pos++;
-                col++;
-                continue;
+                append_token(&head, &tail, t); pos++; col++; continue;
             }
         }
 
@@ -250,7 +263,8 @@ Token *lex(const char *source) {
 void tokens_print(Token *head) {
     const char *type_names[] = {
         "IDENTIFIER", "CONSTANT", "INT", "VOID", "RETURN",
-        "(", ")", "{", "}", ";", "-", "~", "--", "+", "*", "/", "%", "EOF"
+        "(", ")", "{", "}", ";", "-", "~", "--", "+", "*", "/", "%",
+        "!", "&&", "||", "==", "!=", "<", ">", "<=", ">=", "EOF"
     };
     Token *cur = head;
     while (cur) {

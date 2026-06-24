@@ -28,7 +28,12 @@ typedef struct TackyVal {
 typedef enum {
     TACKY_INST_RETURN,
     TACKY_INST_UNARY,
-    TACKY_INST_BINARY
+    TACKY_INST_BINARY,
+    TACKY_INST_COPY,
+    TACKY_INST_JUMP,
+    TACKY_INST_JUMP_IF_ZERO,
+    TACKY_INST_JUMP_IF_NOT_ZERO,
+    TACKY_INST_LABEL
 } TackyInstType;
 
 typedef struct TackyInstruction TackyInstruction;
@@ -48,6 +53,9 @@ struct TackyInstruction {
     /* For TACKY_INST_BINARY */
     BinaryOperator binary_op;
     TackyVal *src2;    /* second source operand */
+
+    /* For Jump / JumpIfZero / JumpIfNotZero / Label */
+    char *target;      /* label/jump target identifier */
 };
 
 typedef struct {
@@ -65,6 +73,11 @@ TackyVal *tacky_val_var(const char *name);
 TackyInstruction *tacky_inst_return(TackyVal *val);
 TackyInstruction *tacky_inst_unary(UnaryOperator op, TackyVal *src, TackyVal *dst);
 TackyInstruction *tacky_inst_binary(BinaryOperator op, TackyVal *src1, TackyVal *src2, TackyVal *dst);
+TackyInstruction *tacky_inst_copy(TackyVal *src, TackyVal *dst);
+TackyInstruction *tacky_inst_jump(const char *target);
+TackyInstruction *tacky_inst_jump_if_zero(TackyVal *cond, const char *target);
+TackyInstruction *tacky_inst_jump_if_not_zero(TackyVal *cond, const char *target);
+TackyInstruction *tacky_inst_label(const char *name);
 TackyInstruction *tacky_append_instruction(TackyInstruction *head, TackyInstruction *inst);
 TackyFunction *tacky_function(const char *name, TackyInstruction *body);
 TackyProgram *tacky_program(TackyFunction *function);

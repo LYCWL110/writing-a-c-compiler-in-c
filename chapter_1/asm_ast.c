@@ -71,6 +71,49 @@ AsmInstruction *make_inst_cdq(void) {
     return inst;
 }
 
+AsmInstruction *make_inst_cmp(AsmOperand *a, AsmOperand *b) {
+    AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = ASM_INST_CMP;
+    inst->src = a;  /* a = cmpl src, dst does dst - src */
+    inst->dst = b;
+    return inst;
+}
+
+AsmInstruction *make_inst_jmp(const char *label) {
+    AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = ASM_INST_JMP;
+    inst->label = strdup(label);
+    return inst;
+}
+
+AsmInstruction *make_inst_jmpcc(CondCode cc, const char *label) {
+    AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = ASM_INST_JMPCC;
+    inst->cond_code = cc;
+    inst->label = strdup(label);
+    return inst;
+}
+
+AsmInstruction *make_inst_setcc(CondCode cc, AsmOperand *dst) {
+    AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = ASM_INST_SETCC;
+    inst->cond_code = cc;
+    inst->operand = dst;
+    return inst;
+}
+
+AsmInstruction *make_inst_label(const char *name) {
+    AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = ASM_INST_LABEL;
+    inst->label = strdup(name);
+    return inst;
+}
+
 AsmInstruction *make_inst_unary(AsmUnaryOp op, AsmOperand *operand) {
     AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
     if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
@@ -165,6 +208,23 @@ void asm_ast_print(AsmProgram *prog) {
                 printf("      Idiv("); asm_ast_print_operand(inst->src); printf(")\n"); break;
             case ASM_INST_CDQ:
                 printf("      Cdq\n"); break;
+            case ASM_INST_CMP:
+                printf("      Cmp("); asm_ast_print_operand(inst->src);
+                printf(", "); asm_ast_print_operand(inst->dst); printf(")\n"); break;
+            case ASM_INST_JMP:
+                printf("      Jmp(\"%s\")\n", inst->label); break;
+            case ASM_INST_JMPCC: {
+                const char *cn[] = {"E","NE","G","GE","L","LE"};
+                printf("      JmpCC(%s, \"%s\")\n", cn[inst->cond_code], inst->label);
+                break;
+            }
+            case ASM_INST_SETCC: {
+                const char *cn[] = {"E","NE","G","GE","L","LE"};
+                printf("      SetCC(%s, ", cn[inst->cond_code]);
+                asm_ast_print_operand(inst->operand); printf(")\n"); break;
+            }
+            case ASM_INST_LABEL:
+                printf("      Label(\"%s\")\n", inst->label); break;
             case ASM_INST_ALLOCATE_STACK:
                 printf("      AllocateStack(%d)\n", inst->src ? inst->src->imm : 0); break;
             case ASM_INST_RET:
@@ -194,6 +254,7 @@ void asm_ast_free(AsmProgram *prog) {
             asm_ast_free_operand(inst->src);
             asm_ast_free_operand(inst->dst);
             asm_ast_free_operand(inst->operand);
+            if (inst->label) free(inst->label);
             free(inst);
             inst = next;
         }
