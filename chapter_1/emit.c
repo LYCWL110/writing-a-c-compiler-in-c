@@ -15,9 +15,11 @@ static void emit_operand(FILE *out, AsmOperand *op) {
         case ASM_OPERAND_IMM:
             fprintf(out, "$%d", op->imm);
             break;
-        case ASM_OPERAND_REG:
-            fprintf(out, "%%%s", op->reg == REG_AX ? "eax" : "r10d");
+        case ASM_OPERAND_REG: {
+            const char *names[] = {"eax", "edx", "r10d", "r11d"};
+            fprintf(out, "%%%s", names[op->reg]);
             break;
+        }
         case ASM_OPERAND_STACK:
             fprintf(out, "%d(%%rbp)", op->stack_offset);
             break;
@@ -43,6 +45,23 @@ static void emit_instruction(FILE *out, AsmInstruction *inst) {
                     inst->unary_op == ASM_UNARY_NEG ? "negl" : "notl");
             emit_operand(out, inst->operand);
             fprintf(out, "\n");
+            break;
+        case ASM_INST_BINARY: {
+            const char *mn[] = {"addl", "subl", "imull"};
+            fprintf(out, "    %s    ", mn[inst->binary_op]);
+            emit_operand(out, inst->src);
+            fprintf(out, ", ");
+            emit_operand(out, inst->dst);
+            fprintf(out, "\n");
+            break;
+        }
+        case ASM_INST_IDIV:
+            fprintf(out, "    idivl   ");
+            emit_operand(out, inst->src);
+            fprintf(out, "\n");
+            break;
+        case ASM_INST_CDQ:
+            fprintf(out, "    cdq\n");
             break;
         case ASM_INST_ALLOCATE_STACK:
             fprintf(out, "    subq    $%d, %%rsp\n", inst->src ? inst->src->imm : 0);

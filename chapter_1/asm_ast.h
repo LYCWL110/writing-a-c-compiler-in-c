@@ -12,6 +12,9 @@ typedef enum {
     ASM_FUNCTION,
     ASM_INST_MOV,
     ASM_INST_UNARY,
+    ASM_INST_BINARY,
+    ASM_INST_IDIV,
+    ASM_INST_CDQ,
     ASM_INST_ALLOCATE_STACK,
     ASM_INST_RET
 } AsmInstType;
@@ -29,8 +32,16 @@ typedef enum {
 } AsmUnaryOp;
 
 typedef enum {
+    ASM_BINARY_ADD,
+    ASM_BINARY_SUB,
+    ASM_BINARY_MULT
+} AsmBinaryOp;
+
+typedef enum {
     REG_AX,    /* %eax */
-    REG_R10    /* %r10d */
+    REG_DX,    /* %edx */
+    REG_R10,   /* %r10d */
+    REG_R11    /* %r11d */
 } RegId;
 
 typedef struct AsmOperand AsmOperand;
@@ -54,6 +65,7 @@ struct AsmInstruction {
     AsmOperand *src;         /* for Mov */
     AsmOperand *dst;         /* for Mov */
     AsmUnaryOp unary_op;     /* for Unary */
+    AsmBinaryOp binary_op;   /* for Binary (add/sub/mult) */
     AsmOperand *operand;     /* for Unary (src and dst are the same) */
 };
 
@@ -75,6 +87,9 @@ AsmOperand *make_operand_pseudo(const char *name);
 AsmOperand *make_operand_stack(int offset);
 AsmInstruction *make_inst_mov(AsmOperand *src, AsmOperand *dst);
 AsmInstruction *make_inst_unary(AsmUnaryOp op, AsmOperand *operand);
+AsmInstruction *make_inst_binary(AsmBinaryOp op, AsmOperand *src, AsmOperand *dst);
+AsmInstruction *make_inst_idiv(AsmOperand *divisor);
+AsmInstruction *make_inst_cdq(void);
 AsmInstruction *make_inst_allocate_stack(int size);
 AsmInstruction *make_inst_ret(void);
 AsmInstruction *append_instruction(AsmInstruction *head, AsmInstruction *new_inst);

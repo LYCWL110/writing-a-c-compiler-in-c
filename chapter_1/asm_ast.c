@@ -46,6 +46,31 @@ AsmInstruction *make_inst_mov(AsmOperand *src, AsmOperand *dst) {
     return inst;
 }
 
+AsmInstruction *make_inst_binary(AsmBinaryOp op, AsmOperand *src, AsmOperand *dst) {
+    AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = ASM_INST_BINARY;
+    inst->binary_op = op;
+    inst->src = src;
+    inst->dst = dst;
+    return inst;
+}
+
+AsmInstruction *make_inst_idiv(AsmOperand *divisor) {
+    AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = ASM_INST_IDIV;
+    inst->src = divisor;
+    return inst;
+}
+
+AsmInstruction *make_inst_cdq(void) {
+    AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = ASM_INST_CDQ;
+    return inst;
+}
+
 AsmInstruction *make_inst_unary(AsmUnaryOp op, AsmOperand *operand) {
     AsmInstruction *inst = calloc(1, sizeof(AsmInstruction));
     if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
@@ -106,7 +131,10 @@ static void asm_ast_print_operand(AsmOperand *op) {
     if (!op) { printf("NULL"); return; }
     switch (op->type) {
         case ASM_OPERAND_IMM:    printf("Imm(%d)", op->imm); break;
-        case ASM_OPERAND_REG:    printf("Reg(%s)", op->reg == REG_AX ? "AX" : "R10"); break;
+        case ASM_OPERAND_REG: {
+            const char *rn[] = {"AX","DX","R10","R11"};
+            printf("Reg(%s)", rn[op->reg]); break;
+        }
         case ASM_OPERAND_PSEUDO: printf("Pseudo(%s)", op->pseudo_name); break;
         case ASM_OPERAND_STACK:  printf("Stack(%d)", op->stack_offset); break;
     }
@@ -126,6 +154,17 @@ void asm_ast_print(AsmProgram *prog) {
                 printf("      Unary(%s, ", inst->unary_op == ASM_UNARY_NEG ? "Neg" : "Not");
                 asm_ast_print_operand(inst->operand);
                 printf(")\n"); break;
+            case ASM_INST_BINARY: {
+                const char *bn[] = {"Add","Sub","Mult"};
+                printf("      Binary(%s, ", bn[inst->binary_op]);
+                asm_ast_print_operand(inst->src);
+                printf(", "); asm_ast_print_operand(inst->dst);
+                printf(")\n"); break;
+            }
+            case ASM_INST_IDIV:
+                printf("      Idiv("); asm_ast_print_operand(inst->src); printf(")\n"); break;
+            case ASM_INST_CDQ:
+                printf("      Cdq\n"); break;
             case ASM_INST_ALLOCATE_STACK:
                 printf("      AllocateStack(%d)\n", inst->src ? inst->src->imm : 0); break;
             case ASM_INST_RET:

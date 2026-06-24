@@ -13,9 +13,13 @@ typedef enum {
     TOK_LBRACE,     /* { */
     TOK_RBRACE,     /* } */
     TOK_SEMICOLON,  /* ; */
-    TOK_MINUS,      /* - (negation) */
+    TOK_MINUS,      /* - (negation/subtraction) */
     TOK_COMPLEMENT, /* ~ (bitwise complement) */
     TOK_DECREMENT,  /* -- (decrement, not supported yet) */
+    TOK_PLUS,       /* + */
+    TOK_STAR,       /* * */
+    TOK_SLASH,      /* / */
+    TOK_PERCENT,    /* % */
     TOK_EOF
 } TokenType;
 

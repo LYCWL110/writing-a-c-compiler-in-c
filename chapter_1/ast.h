@@ -12,13 +12,22 @@ typedef enum {
     AST_FUNCTION,
     AST_STATEMENT_RETURN,
     AST_EXP_CONSTANT,
-    AST_EXP_UNARY
+    AST_EXP_UNARY,
+    AST_EXP_BINARY
 } AstNodeType;
 
 typedef enum {
     UNARY_COMPLEMENT,   /* ~ */
     UNARY_NEGATE        /* - */
 } UnaryOperator;
+
+typedef enum {
+    BINARY_ADD,
+    BINARY_SUBTRACT,
+    BINARY_MULTIPLY,
+    BINARY_DIVIDE,
+    BINARY_REMAINDER
+} BinaryOperator;
 
 /* Forward declarations */
 typedef struct Exp Exp;
@@ -35,6 +44,11 @@ struct Exp {
             UnaryOperator operator;    /* AST_EXP_UNARY */
             struct Exp *operand;
         } unary;
+        struct {
+            BinaryOperator operator;   /* AST_EXP_BINARY */
+            struct Exp *left;
+            struct Exp *right;
+        } binary;
     };
 };
 
@@ -60,6 +74,7 @@ struct Program {
 /* Constructor functions */
 Exp  *make_exp_constant(int value);
 Exp  *make_exp_unary(UnaryOperator op, Exp *operand);
+Exp  *make_exp_binary(BinaryOperator op, Exp *left, Exp *right);
 Statement *make_statement_return(Exp *return_val);
 FunctionDef *make_function_def(char *name, Statement *body);
 Program *make_program(FunctionDef *function);

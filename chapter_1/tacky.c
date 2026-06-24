@@ -41,6 +41,18 @@ TackyInstruction *tacky_inst_unary(UnaryOperator op, TackyVal *src, TackyVal *ds
     return inst;
 }
 
+TackyInstruction *tacky_inst_binary(BinaryOperator op, TackyVal *src1, TackyVal *src2, TackyVal *dst) {
+    TackyInstruction *inst = malloc(sizeof(TackyInstruction));
+    if (!inst) { fprintf(stderr, "Memory error\n"); exit(1); }
+    inst->type = TACKY_INST_BINARY;
+    inst->next = NULL;
+    inst->binary_op = op;
+    inst->src = src1;
+    inst->src2 = src2;
+    inst->dst = dst;
+    return inst;
+}
+
 TackyInstruction *tacky_append_instruction(TackyInstruction *head, TackyInstruction *inst) {
     if (!head) return inst;
     TackyInstruction *cur = head;
@@ -88,9 +100,19 @@ void tacky_print(TackyProgram *prog) {
             printf("      Return(");
             tacky_print_val(inst->val);
             printf(")\n");
-        } else {
+        } else if (inst->type == TACKY_INST_UNARY) {
             printf("      Unary(%s, ", unary_op_name(inst->unary_op));
             tacky_print_val(inst->src);
+            printf(", ");
+            tacky_print_val(inst->dst);
+            printf(")\n");
+        } else {
+            /* Use the binary op name from ast.h */
+            static const char *bn[] = {"Add","Subtract","Multiply","Divide","Remainder"};
+            printf("      Binary(%s, ", bn[inst->binary_op]);
+            tacky_print_val(inst->src);
+            printf(", ");
+            tacky_print_val(inst->src2);
             printf(", ");
             tacky_print_val(inst->dst);
             printf(")\n");
@@ -113,6 +135,10 @@ void tacky_free_instructions(TackyInstruction *inst) {
         TackyInstruction *next = inst->next;
         if (inst->type == TACKY_INST_UNARY) {
             tacky_free_val(inst->src);
+            tacky_free_val(inst->dst);
+        } else if (inst->type == TACKY_INST_BINARY) {
+            tacky_free_val(inst->src);
+            tacky_free_val(inst->src2);
             tacky_free_val(inst->dst);
         } else {
             tacky_free_val(inst->val);

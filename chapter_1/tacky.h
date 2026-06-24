@@ -27,7 +27,8 @@ typedef struct TackyVal {
 
 typedef enum {
     TACKY_INST_RETURN,
-    TACKY_INST_UNARY
+    TACKY_INST_UNARY,
+    TACKY_INST_BINARY
 } TackyInstType;
 
 typedef struct TackyInstruction TackyInstruction;
@@ -43,6 +44,10 @@ struct TackyInstruction {
     UnaryOperator unary_op;
     TackyVal *src;
     TackyVal *dst;
+
+    /* For TACKY_INST_BINARY */
+    BinaryOperator binary_op;
+    TackyVal *src2;    /* second source operand */
 };
 
 typedef struct {
@@ -59,6 +64,7 @@ TackyVal *tacky_val_constant(int value);
 TackyVal *tacky_val_var(const char *name);
 TackyInstruction *tacky_inst_return(TackyVal *val);
 TackyInstruction *tacky_inst_unary(UnaryOperator op, TackyVal *src, TackyVal *dst);
+TackyInstruction *tacky_inst_binary(BinaryOperator op, TackyVal *src1, TackyVal *src2, TackyVal *dst);
 TackyInstruction *tacky_append_instruction(TackyInstruction *head, TackyInstruction *inst);
 TackyFunction *tacky_function(const char *name, TackyInstruction *body);
 TackyProgram *tacky_program(TackyFunction *function);

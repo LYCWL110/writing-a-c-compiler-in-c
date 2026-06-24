@@ -21,11 +21,20 @@ static TackyVal *emit_tacky_exp(Exp *e, TackyInstruction **instructions) {
         return tacky_val_constant(e->value);
     }
 
-    if (e->type == AST_EXP_UNARY) {
-        /* Recursively flatten the inner expression */
-        TackyVal *src = emit_tacky_exp(e->unary.operand, instructions);
+    if (e->type == AST_EXP_BINARY) {
+        TackyVal *v1 = emit_tacky_exp(e->binary.left, instructions);
+        TackyVal *v2 = emit_tacky_exp(e->binary.right, instructions);
+        char *tmp_name = make_temporary();
+        TackyVal *dst = tacky_val_var(tmp_name);
+        free(tmp_name);
+        TackyInstruction *inst = tacky_inst_binary(e->binary.operator, v1, v2, dst);
+        *instructions = tacky_append_instruction(*instructions, inst);
+        TackyVal *result = tacky_val_var(dst->name);
+        return result;
+    }
 
-        /* Create a destination temporary variable */
+    if (e->type == AST_EXP_UNARY) {
+        TackyVal *src = emit_tacky_exp(e->unary.operand, instructions);
         char *tmp_name = make_temporary();
         TackyVal *dst = tacky_val_var(tmp_name);
         free(tmp_name);
