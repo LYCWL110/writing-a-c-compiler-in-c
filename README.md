@@ -39,18 +39,4 @@ make
 ## 支持的语言特性
 
 - `int main(void) { return <exp>; }`
-- 表达式支持：整数常量、取负（`-`）、按位取反（`~`）、括号（`(<exp>)`）
-- 嵌套一元表达式
-
-<<<<<<< HEAD
-
-=======
-## 使用示例
-
-```bash
-echo 'int main(void) { return 1+2*3; }' > test.c
-./compiler test.c
-./test
-echo $?   # 输出 7
-```
->>>>>>> 685bcd5 (chore: remove test targets (tests not in repo))
+- 表达式支持：整数常量、取负（`-`）、按位取反（`~`）、括号、加减乘除取余
