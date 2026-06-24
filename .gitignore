@@ -1,8 +1,0 @@
-*.o
-compiler
-*.i
-*.s
-*.out
-CHANGES.md
-CHAPTER2_EXPLAINED.md
-.claude/
