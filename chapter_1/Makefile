@@ -22,26 +22,4 @@ clean:
 	rm -f $(TARGET) $(OBJS)
 	rm -f *.i *.s
 
-test:
-	@echo "Building compiler..."
-	@$(MAKE) --no-print-directory $(TARGET)
-	@echo "Running test suite..."
-	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --expected-error-codes 1
-
-test-lex:
-	@$(MAKE) --no-print-directory $(TARGET)
-	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --stage lex
-
-test-parse:
-	@$(MAKE) --no-print-directory $(TARGET)
-	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --stage parse
-
-test-tacky:
-	@$(MAKE) --no-print-directory $(TARGET)
-	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --stage tacky
-
-test-codegen:
-	@$(MAKE) --no-print-directory $(TARGET)
-	python3 /home/lycwl/code/writing-a-c-compiler-tests-main./writing-a-c-compiler-tests-main/writing-a-c-compiler-tests-main/test_compiler ./$(TARGET) --chapter 2 --stage codegen
-
-.PHONY: all clean test test-lex test-parse test-tacky test-codegen
+.PHONY: all clean
