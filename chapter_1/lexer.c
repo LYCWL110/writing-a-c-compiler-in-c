@@ -152,7 +152,7 @@ Token *lex(const char *source) {
         switch (source[pos]) {
             case '(': case ')': case '{': case '}': case ';':
             case '~': case '-': case '+': case '*': case '/': case '%':
-            case '!': case '<': case '>': {
+            case '!': case '<': case '>': case '=': {
                 TokenType tt;
                 switch (source[pos]) {
                     case '(': tt = TOK_LPAREN; break;
@@ -169,6 +169,7 @@ Token *lex(const char *source) {
                     case '!': tt = TOK_NOT; break;
                     case '<': tt = TOK_LT; break;
                     case '>': tt = TOK_GT; break;
+                    case '=': tt = TOK_ASSIGN; break;
                     default:  tt = TOK_EOF; break;
                 }
                 char lex[2] = {source[pos], '\0'};
@@ -264,7 +265,7 @@ void tokens_print(Token *head) {
     const char *type_names[] = {
         "IDENTIFIER", "CONSTANT", "INT", "VOID", "RETURN",
         "(", ")", "{", "}", ";", "-", "~", "--", "+", "*", "/", "%",
-        "!", "&&", "||", "==", "!=", "<", ">", "<=", ">=", "EOF"
+        "!", "&&", "||", "==", "!=", "<", ">", "<=", ">=", "=", "EOF"
     };
     Token *cur = head;
     while (cur) {

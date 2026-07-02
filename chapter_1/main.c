@@ -8,6 +8,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "tacky_gen.h"
+#include "semantic.h"
 #include "codegen.h"
 #include "emit.h"
 #include "ast.h"
@@ -76,6 +77,7 @@ static void print_usage(const char *prog) {
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  --lex      Stop after lexing\n");
     fprintf(stderr, "  --parse    Stop after parsing\n");
+    fprintf(stderr, "  --validate Stop after semantic analysis\n");
     fprintf(stderr, "  --tacky    Stop after TACKY generation\n");
     fprintf(stderr, "  --codegen  Stop after code generation\n");
     fprintf(stderr, "  -S         Output assembly file only, don't assemble or link\n");
@@ -84,6 +86,7 @@ static void print_usage(const char *prog) {
 int main(int argc, char **argv) {
     int stop_lex = 0;
     int stop_parse = 0;
+    int stop_validate = 0;
     int stop_tacky = 0;
     int stop_codegen = 0;
     int emit_asm_only = 0;
@@ -95,6 +98,8 @@ int main(int argc, char **argv) {
             stop_lex = 1;
         } else if (strcmp(argv[i], "--parse") == 0) {
             stop_parse = 1;
+        } else if (strcmp(argv[i], "--validate") == 0) {
+            stop_validate = 1;
         } else if (strcmp(argv[i], "--tacky") == 0) {
             stop_tacky = 1;
         } else if (strcmp(argv[i], "--codegen") == 0) {
@@ -153,6 +158,18 @@ int main(int argc, char **argv) {
     }
 
     if (stop_parse) {
+        ast_free(ast); tokens_free(tokens); free(source);
+        remove(preprocessed_file); free(preprocessed_file); return 0;
+    }
+
+    /* Semantic analysis */
+    ast = semantic_analysis(ast);
+    if (!ast) {
+        tokens_free(tokens); free(source); remove(preprocessed_file);
+        free(preprocessed_file); return 1;
+    }
+
+    if (stop_validate) {
         ast_free(ast); tokens_free(tokens); free(source);
         remove(preprocessed_file); free(preprocessed_file); return 0;
     }

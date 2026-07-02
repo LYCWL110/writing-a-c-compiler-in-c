@@ -8,7 +8,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 TARGET = compiler
-OBJS = main.o lexer.o parser.o ast.o tacky.o tacky_gen.o asm_ast.o codegen.o emit.o
+OBJS = main.o lexer.o parser.o ast.o semantic.o tacky.o tacky_gen.o asm_ast.o codegen.o emit.o
 
 all: $(TARGET)
 

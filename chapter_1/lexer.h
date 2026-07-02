@@ -29,6 +29,7 @@ typedef enum {
     TOK_GT,         /* > */
     TOK_LEQ,        /* <= */
     TOK_GEQ,        /* >= */
+    TOK_ASSIGN,     /* = */
     TOK_EOF
 } TokenType;
 
